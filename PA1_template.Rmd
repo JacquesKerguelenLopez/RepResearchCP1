@@ -1,0 +1,144 @@
+---
+title: "PA1_template.Rmd"
+output: html_document
+---
+
+Load and preprocessing the data
+
+``` {r load&preprocess}
+setwd("C:/Users/Jack Kerguenel/Documents/Data science/Rep Research/Course Project 1")
+## Read the data
+rawData<-read.csv("activity.csv")
+## Change the Date column from character type to date type
+rawData$date<-as.Date(rawData$date, format="%Y-%m-%d")
+```
+
+Total number of steps taken per day
+
+```{r TotalNumberOfStepsPerDay}
+## Total number of steps taken per day
+totalStepsPerDay<-aggregate(rawData$steps,by=list(Group.date=rawData$date),sum)
+names(totalStepsPerDay)<-c("Group.date","Total.steps")
+```
+
+Histogram of total numbers of steps per day
+
+```{r histogram}
+## Parameters og graph
+par(las=2,cex=0.5)
+## Histogram
+barplot(totalStepsPerDay$Total.steps,names.arg=totalStepsPerDay$Group.date)
+```
+
+Calculation of the mean and median of the total number of steps taken each day
+
+```{r mean&median}
+meanStepsPerDay<-mean(totalStepsPerDay$Total.steps,na.rm=TRUE)
+medianStepsPerDay<-median(totalStepsPerDay$Total.steps,na.rm=TRUE)
+```
+
+The mean of the total number of steps taken each day is `r meanStepsPerDay` and the median is `r medianStepsPerDay`
+
+Time series plot for mean steps per interval throughout all days
+
+```{r PlotMeansPerInterval}
+meanStepsPerInterval<-aggregate(rawData$steps,by=list(Group.interval=rawData$interval),function(x) mean(x,na.rm=TRUE))
+names(meanStepsPerInterval)<-c("Group.interval","Mean.steps")
+plot(meanStepsPerInterval$Group.interval,meanStepsPerInterval$Mean.steps,type = "l",xlab="Interval",ylab="Mean steps")
+```
+
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+``` {r WhichMaxIn5MinInterval}
+maxIndex<-which.max(meanStepsPerInterval$Mean.steps)
+maxInterval<-meanStepsPerInterval$Group.interval[maxIndex]
+```
+The 5-minute interval that on average contains the maximum number of steps is `r maxInterval`
+
+Number of NAs in the raw data
+
+``` {r NumberOfNAs}
+logicVector<-is.na(rawData$steps)
+NANumber<-sum(logicVector)
+NANumberPercent<-mean(logicVector)*100
+```
+The number of NAs in the steps column of the raw data is `r NANumber`
+
+Imputing steps with NAs in raw data with the mean of the steps throughout all days in the corresponding interval
+```{r Imputting}
+rawDataExtended<-data.frame(rawData, is.na=logicVector)
+for (i in 1:17568) {
+        if (rawDataExtended$is.na[i]==TRUE) {
+                interval<-rawDataExtended$interval[i]
+                index<-which(meanStepsPerInterval$Group.interval==interval)
+                rawDataExtended$steps[i]<-meanStepsPerInterval$Mean.steps[index]
+        }
+}
+```
+
+Total number of steps taken per day with the imputed dataset
+
+```{r TotalNumberOfStepsPerDayWithImputedDataset}
+## Total number of steps taken per day
+totalStepsPerDayImputed<-aggregate(rawDataExtended$steps,by=list(Group.date=rawDataExtended$date),sum)
+names(totalStepsPerDayImputed)<-c("Group.date","Total.steps")
+```
+
+Histogram of total numbers of steps per day with the imputed dataset
+
+```{r HistogramImputedDataset}
+## Parameters og graph
+par(las=2,cex=0.5)
+## Histogram
+barplot(totalStepsPerDayImputed$Total.steps,names.arg=totalStepsPerDayImputed$Group.date)
+```
+
+Calculation of the mean and median of the total number of steps taken each day with the imputed dataset
+
+```{r mean&medianImputedDataset}
+meanStepsPerDayImputed<-mean(totalStepsPerDayImputed$Total.steps,na.rm=TRUE)
+medianStepsPerDayImputed<-median(totalStepsPerDayImputed$Total.steps,na.rm=TRUE)
+```
+
+The mean of the total number of steps taken each day with the imputed dataset is `r meanStepsPerDayImputed` and the median is `r medianStepsPerDayImputed`; as it can be seen the mean does not change from the raw dataset with NAs to the imputed dataset, and the median changes just a bit, mainly because the imputed values are calculated from the 5-minutes intervals means of the rest of the data, which overall makes it more or less the same for summary statistics purposes. 
+
+Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day
+
+```{r addingTheFactorWeekendOrWeekday}
+## Adding the name of the day
+rawDataExtended1<-data.frame(rawDataExtended,weekday=weekdays(rawDataExtended$date),weekdayOrWeekendCharacter=c("weekday"))
+## Find out if a day is weekday or weekend and add that as a column of factors
+for (i in 1:nrow(rawDataExtended1)) {
+        if (rawDataExtended1$weekday[i]=="sábado" | rawDataExtended1$weekday[i]=="domingo") {
+        rawDataExtended1$weekdayOrWeekendCharacter[i]<-c("weekend")
+        }
+}
+rawDataExtended1<-data.frame(rawDataExtended1,weekdayOrWeekendFactor=as.factor(rawDataExtended1$weekdayOrWeekendCharacter))
+## Eliminate columns that are not useful anymore
+rawDataExtended1$is.na=NULL
+rawDataExtended1$weekdayOrWeekendCharacter=NULL
+```
+
+Panel plot time series plot for mean steps per interval for weekends and for weekdays 
+
+```{r PlotMeansPerIntervalWeekends/Weekdays}
+## Subset of weekdays and weekends
+weekdaysSubset<-subset(rawDataExtended1,rawDataExtended1$weekdayOrWeekendFactor=="weekday")
+weekendSubset<-subset(rawDataExtended1,rawDataExtended1$weekdayOrWeekendFactor=="weekend")
+## Average steps for intervals on weekdays
+meanStepsPerIntervalWeekdays<-aggregate(weekdaysSubset$steps,by=list(Group.interval=weekdaysSubset$interval),function(x) mean(x,na.rm=TRUE))
+names(meanStepsPerIntervalWeekdays)<-c("Interval","Mean steps")
+meanStepsPerIntervalWeekdays<-data.frame(meanStepsPerIntervalWeekdays,Weekday.or.weekend=as.factor("weekday"))
+## Average steps for intervals on weekends
+meanStepsPerIntervalWeekends<-aggregate(weekendSubset$steps,by=list(Group.interval=weekendSubset$interval),function(x) mean(x,na.rm=TRUE))
+names(meanStepsPerIntervalWeekends)<-c("Interval","Mean steps")
+meanStepsPerIntervalWeekends<-data.frame(meanStepsPerIntervalWeekends,Weekday.or.weekend=as.factor("weekend"))
+## Append Mean Steps Per Intervals data frames
+mergedDataFrames<-rbind(meanStepsPerIntervalWeekdays,meanStepsPerIntervalWeekends)
+names(mergedDataFrames)<-c("Interval","Mean.steps","Weekday.or.weekend")
+## Panel plots
+library(ggplot2)
+graph<-ggplot(mergedDataFrames,aes(x=Interval,y=Mean.steps))
+graph<-graph + geom_line() + facet_grid(Weekday.or.weekend ~ .)
+graph
+```
